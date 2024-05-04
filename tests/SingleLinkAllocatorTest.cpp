@@ -13,7 +13,7 @@
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
 #endif
-/*
+
 namespace dae
 {
 	const size_t block_size = sizeof(void*) * 4;
@@ -132,6 +132,3 @@ namespace dae
 			if (pointer != nullptr) allocator.Release(pointer);
 	}
 }
-
-
-*/
