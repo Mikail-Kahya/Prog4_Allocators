@@ -120,10 +120,16 @@ namespace dae
 		}
 
 		constexpr uint8_t skipStep{ 2 };
-		for (uint8_t idx{}; idx < nrFragments / skipStep; ++idx)
+		for (uint8_t idx{}; idx < nrFragments / skipStep; idx += 2)
+		{
 			allocator.Release(pointers[idx]);
+			pointers[idx] = nullptr;
+		}
 
-		EXPECT_THROW(allocator.Acquire(block_size * 100), std::bad_alloc);
+		EXPECT_THROW(allocator.Acquire(block_size), std::bad_alloc);
+
+		for (const auto pointer : pointers)
+			if (pointer != nullptr) allocator.Release(pointer);
 	}
 }
 

@@ -33,7 +33,7 @@ namespace dae
 
 	public:
 		explicit SingleLinkAllocator(size_t sizeInBytes);
-		virtual ~SingleLinkAllocator();
+		~SingleLinkAllocator() override;
 
 		/// <summary>
 		/// Gets a pointer to a piece of memory.

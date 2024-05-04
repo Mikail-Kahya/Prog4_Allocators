@@ -21,7 +21,7 @@ endif()
 add_library(allocator_lib
     allocators/MemoryOverrides.cpp
     allocators/SingleLinkAllocator.cpp
-)
+ "allocators/FixedSizeAllocator.cpp")
 
 # compile at max warning level + treat warnings as errors
 target_compile_options(allocator_lib PRIVATE
@@ -33,7 +33,7 @@ $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Werror>
 add_executable(allocator_tests
     tests/SingleLinkAllocatorTest.cpp
     tests/main.cpp
- )
+  "tests/FixedSizeAllocatorTest.cpp")
 
 # compile at max warning level + treat warnings as errors
 target_compile_options(allocator_tests PRIVATE
