@@ -33,7 +33,7 @@ $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Werror>
 add_executable(allocator_tests
     tests/SingleLinkAllocatorTest.cpp
     tests/main.cpp
-)
+ )
 
 # compile at max warning level + treat warnings as errors
 target_compile_options(allocator_tests PRIVATE
