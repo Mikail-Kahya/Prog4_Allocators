@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <gtest/gtest.h>
 
@@ -22,20 +23,21 @@ namespace dae
 		float m_float{ 0 };
 	};
 
-	constexpr size_t NR_OBJECTS{ 20 };
-	constexpr size_t NR_BYTES{ sizeof(Object) * NR_OBJECTS };
+	constexpr size_t NR_OBJECTS{ 4 };
+	constexpr size_t OBJECT_SIZE{ sizeof(Object) };
+	constexpr size_t NR_BYTES{ OBJECT_SIZE * NR_OBJECTS };
 
 	TEST(StackAllocatorTests, SingleAllocation)
 	{
 		StackAllocator allocator(NR_BYTES);
-		Object* objectPtr{ new (allocator) Object{1, 0.6f} };
-		delete objectPtr;
+		void* pointer{ allocator.Acquire(OBJECT_SIZE) };
+		EXPECT_NE(pointer, nullptr);
+		allocator.Release(pointer);
 	}
-	/*
 
 	TEST(StackAllocatorTests, NewDelete)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
+		StackAllocator allocator(NR_BYTES);
 	
 		Object* pointer = new (allocator) Object();
 		EXPECT_NE(pointer, nullptr);
@@ -43,10 +45,11 @@ namespace dae
 		delete pointer;
 	}
 
+	
 	TEST(StackAllocatorTests, InvalidRelease)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-	
+		StackAllocator allocator(NR_BYTES);
+
 		void* pointer = new char;
 		EXPECT_THROW(allocator.Release(pointer), std::runtime_error);
 		delete pointer;
@@ -54,38 +57,37 @@ namespace dae
 
 	TEST(StackAllocatorTests, TwoAllocations)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-		
-		constexpr size_t objectSize{ sizeof(Object) };
-		constexpr size_t allocateSize{ objectSize + sizeof(MemoryAllocator::Tag) };
+		StackAllocator allocator(NR_BYTES);
 	
 		void* pointer_a{};
 		void* pointer_b{};
-		pointer_a = allocator.Acquire(allocateSize);
-		pointer_b = allocator.Acquire(allocateSize);
+		pointer_a = allocator.Acquire(OBJECT_SIZE);
+		pointer_b = allocator.Acquire(OBJECT_SIZE);
 		EXPECT_NE(pointer_a, nullptr);
 		EXPECT_NE(pointer_b, nullptr);
-		std::memset(pointer_a, 1, objectSize);
-		std::memset(pointer_b, 1, objectSize);
+		std::memset(pointer_a, 1, OBJECT_SIZE);
+		std::memset(pointer_b, 1, OBJECT_SIZE);
 		allocator.Release(pointer_a);
 		allocator.Release(pointer_b);
 	}
 
+	
 	TEST(StackAllocatorTests, FullAllocation)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-		std::array<void*, NR_BLOCKS> objects{};
+		StackAllocator allocator(NR_BYTES);
+		std::array<void*, NR_OBJECTS> objects{};
 		
 		for (void*& object : objects)
-			object = allocator.Acquire(sizeof(Object) + sizeof(MemoryAllocator::Tag));
+			object = allocator.Acquire(OBJECT_SIZE);
 		for (void* object : objects)
 			allocator.Release(object);
 	}
 
+	
 	TEST(StackAllocatorTests, FullAllocationDeleteNew)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-		std::array<Object*, NR_BLOCKS> objects{};
+		StackAllocator allocator(NR_BYTES + sizeof(MemoryAllocator::Tag) * NR_OBJECTS);
+		std::array<Object*, NR_OBJECTS> objects{};
 	
 		for (auto& object : objects)
 		{
@@ -100,10 +102,10 @@ namespace dae
 		}
 	}
 
-	TEST(StackAllocatorTests, FullRelease)
+	TEST(StackAllocatorTests, OverAllocate)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-		std::array<Object*, NR_BLOCKS> objects{};
+		StackAllocator allocator(NR_BYTES + sizeof(MemoryAllocator::Tag) * NR_OBJECTS);
+		std::array<Object*, NR_OBJECTS> objects{};
 
 		for (auto& object : objects)
 		{
@@ -112,7 +114,7 @@ namespace dae
 		}
 
 		EXPECT_THROW(new (allocator) Object{}, std::bad_alloc);
-#
+
 		for (auto& object : objects)
 		{
 			delete object;
@@ -120,10 +122,11 @@ namespace dae
 		}
 	}
 
-	TEST(StackAllocatorTests, MarkerRelease)
+	
+	TEST(StackAllocatorTests, FullRelease)
 	{
-		FixedSizeAllocator<Object> allocator(NR_BLOCKS);
-		std::array<Object*, NR_BLOCKS> objects{};
+		StackAllocator allocator(NR_BYTES + sizeof(MemoryAllocator::Tag) * NR_OBJECTS);
+		std::array<Object*, NR_OBJECTS> objects{};
 
 		for (auto& object : objects)
 		{
@@ -131,17 +134,41 @@ namespace dae
 			EXPECT_NE(object, nullptr);
 		}
 
-		for (size_t idx{}; idx < objects.size(); idx += 2)
-		{
-			delete objects[idx];
-			objects[idx] = nullptr;
-		}
-
-		for (size_t idx{}; idx < objects.size(); idx += 2)
-		{
-			objects[idx] = new (allocator) Object{10, 0};
-			EXPECT_NE(objects[idx], nullptr);
-		}
+		allocator.FullRelease();
 	}
-	*/
+
+	
+	TEST(StackAllocatorTests, MarkerRelease)
+	{
+		StackAllocator allocator(NR_BYTES + sizeof(MemoryAllocator::Tag) * NR_OBJECTS);
+		std::array<Object*, NR_OBJECTS> objects{};
+		constexpr size_t halfCount{ NR_OBJECTS / 2 };
+
+		std::for_each_n(objects.begin(), halfCount, [&allocator](Object*& objectPtr)
+			{
+				objectPtr = new (allocator) Object{ 10, 0 };
+				EXPECT_NE(objectPtr, nullptr);
+			});
+
+		allocator.SetMarker();
+
+
+		std::for_each_n(objects.begin() + halfCount, halfCount, [&allocator](Object*& objectPtr)
+			{
+				objectPtr = new (allocator) Object{ 10, 0 };
+				EXPECT_NE(objectPtr, nullptr);
+			});
+
+		allocator.ReleaseTillMarker();
+
+
+		// Reallocate after marker release
+		std::for_each_n(objects.begin() + halfCount, halfCount, [&allocator](Object*& objectPtr)
+			{
+				objectPtr = new (allocator) Object{ 10, 0 };
+				EXPECT_NE(objectPtr, nullptr);
+			});
+
+		allocator.FullRelease();
+	}
 }

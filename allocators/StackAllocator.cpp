@@ -16,7 +16,7 @@ dae::StackAllocator::~StackAllocator()
 
 void* dae::StackAllocator::Acquire(size_t nbBytes)
 {
-	if (m_HeadByte + nbBytes >= m_PoolSize)
+	if (m_HeadByte + nbBytes > m_PoolSize)
 		throw std::bad_alloc();
 
 	const size_t current{ m_HeadByte };
